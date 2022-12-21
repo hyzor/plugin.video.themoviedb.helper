@@ -1,6 +1,6 @@
 import xbmcgui
 from resources.lib.addon.plugin import get_infolabel, get_condvisibility, get_localized
-from resources.lib.addon.logger import kodi_try_except
+from resources.lib.addon.logger import kodi_try_except, kodi_log
 from resources.lib.addon.window import get_property, get_current_window
 from resources.lib.monitor.common import CommonMonitorFunctions, SETMAIN_ARTWORK, SETPROP_RATINGS
 from resources.lib.monitor.images import ImageFunctions
@@ -129,6 +129,7 @@ class ListItemMonitor(CommonMonitorFunctions):
 
     def on_exit(self, keep_tv_artwork=False, is_done=True):
         if self._listcontainer:
+            kodi_log(f'SM: on_exit add_item_listcontainer', 1)
             return self.add_item_listcontainer(ListItem().get_listitem())
         try:
             ignore_keys = SETMAIN_ARTWORK if keep_tv_artwork and self._item._dbtype in ['episodes', 'seasons'] else None
@@ -162,39 +163,53 @@ class ListItemMonitor(CommonMonitorFunctions):
         _id_w_list = self.get_listcontainer(_id_window)
         if not _id_w_list or _id_w_list == -1:
             return
+        kodi_log(f'SM: get_context_listitem add_item_listcontainer', 1)
         self.add_item_listcontainer(self._last_listitem, _id_dialog, _id_d_list)
 
     def add_item_listcontainer(self, listitem, window_id=None, container_id=None):
+        kodi_log(f'SM: add_item_listcontainer: start', 1)
         try:
             _win = xbmcgui.Window(window_id or self._cur_window)  # Note get _win separate from _lst
             _lst = _win.getControl(container_id or self._listcontainer)  # Note must get _lst in same func as addItem else crash
         except Exception:
             _lst = None
         if not _lst:
+            kodi_log(f'SM: add_item_listcontainer: failed to get control', 1)
             return
         _lst.addItem(listitem)  # Note dont delay adding listitem after retrieving list else memory reference changes
+        kodi_log(f'SM: add_item_listcontainer: complete', 1)
         return listitem
 
     def on_finalise_listcontainer(self, process_artwork=True, process_ratings=True):
+        kodi_log(f'SM: on_finalise_listcontainer', 1)
         _item = self._item
+        kodi_log(f'SM: on_finalise get_additional_properties', 1)
         _item.get_additional_properties()
+        kodi_log(f'SM: on_finalise get_builtitem', 1)
         _listitem = self._last_listitem = _item.get_builtitem()
 
         # Item changed so reset properties
         if not self.is_same_item():
+            kodi_log(f'SM: on_finalise is_same_item', 1)
             return self.on_exit(keep_tv_artwork=True)
 
         if process_artwork != ADD_AFTER_PROCESSING and process_ratings != ADD_AFTER_PROCESSING:
             if self._pre_artwork_thread:
+                kodi_log(f'SM: on_finalise _pre_artwork_thread join', 1)
                 self._pre_artwork_thread.join()
                 self._pre_artwork_thread = None
+            kodi_log(f'SM: on_finalise _pre_artwork_thread add', 1)
             self.add_item_listcontainer(_listitem)
 
         def _process_artwork():
+            kodi_log(f'SM: on_finalise _process_artwork get_builtartwork', 1)
             _artwork = _item.get_builtartwork()
+            kodi_log(f'SM: on_finalise _process_artwork get_image_manipulations', 1)
             _artwork.update(_item.get_image_manipulations())
+            kodi_log(f'SM: on_finalise _process_artwork setArt', 1)
             _listitem.setArt(_artwork)
             if process_artwork == ADD_AFTER_PROCESSING and self.is_same_item():
+                kodi_log(f'SM: on_finalise _process_artwork add_item_listcontainer', 1)
                 self.add_item_listcontainer(_listitem)
 
         if process_artwork:
@@ -204,10 +219,13 @@ class ListItemMonitor(CommonMonitorFunctions):
             t.start()
 
         def _process_ratings():
+            kodi_log(f'SM: on_finalise _process_ratings get_all_ratings', 1)
             get_property('IsUpdatingRatings', 'True')
             _details = _item.get_all_ratings() or {}
+            kodi_log(f'SM: on_finalise _process_ratings setProperties', 1)
             _listitem.setProperties(_details.get('infoproperties') or {})
             if process_ratings == ADD_AFTER_PROCESSING and self.is_same_item():
+                kodi_log(f'SM: on_finalise _process_ratings add_item_listcontainer', 1)
                 self.add_item_listcontainer(_listitem)
             get_property('IsUpdatingRatings', clear_property=True)
 
@@ -269,6 +287,7 @@ class ListItemMonitor(CommonMonitorFunctions):
 
         # No readahead has started so let's start one
         if not self._readahead:
+            kodi_log(f'SM: Early exit get_readahead', 1)
             self._readahead = ListItemReadAhead(self, self._cur_window, self._cur_item)
 
         # Readahead next item and if the main item changes in the meantime we reset to None
@@ -297,9 +316,11 @@ class ListItemMonitor(CommonMonitorFunctions):
 
         # Ignore some special folders like next page and parent folder
         if self.get_infolabel('Label') in self._ignored_labels:
+            kodi_log(f'SM: Early _ignored_labels', 1)
             return self.on_exit()
 
         # Set a property for skins to check if item details are updating
+        kodi_log(f'SM: setup_listitem for: {self._cur_window} {self._listcontainer} {self.container_item}', 1)
         get_property('IsUpdating', 'True')
 
         # Clear properties for clean slate if user opened a new directory and using window properties
@@ -307,6 +328,7 @@ class ListItemMonitor(CommonMonitorFunctions):
             self.on_exit(is_done=False)
 
         # Get the current listitem details for the details lookup
+        kodi_log(f'SM: setup_current_item', 1)
         self.setup_current_item()
 
         # Thread image functions to prevent blocking details lookup
@@ -318,11 +340,13 @@ class ListItemMonitor(CommonMonitorFunctions):
             return get_property('IsUpdating', clear_property=True)
 
         # Get item details
+        kodi_log(f'SM: get_itemdetails', 1)
         uncached_func = self._clearfunc_lc if self._listcontainer else self._clearfunc_wp
         self._item.get_itemdetails(**uncached_func)
 
         # Get library stats for person
         if get_condvisibility("!Skin.HasSetting(TMDbHelper.DisablePersonStats)"):
+            kodi_log(f'SM: get_person_stats', 1)
             self._item.get_person_stats()
 
         # Finish up setting our details to the container/window
