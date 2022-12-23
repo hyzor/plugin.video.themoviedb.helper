@@ -312,7 +312,7 @@ class ListItemMonitor(CommonMonitorFunctions):
 
         # Check if the item has changed before retrieving details again
         if self.is_same_window(update=True) and self.is_same_item(update=True):
-            return self.get_readahead() if self._listcontainer else None
+            return  # return self.get_readahead() if self._listcontainer else None
 
         # Ignore some special folders like next page and parent folder
         if self.get_infolabel('Label') in self._ignored_labels:
