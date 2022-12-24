@@ -130,7 +130,7 @@ class ListItemMonitor(CommonMonitorFunctions):
     def on_exit(self, keep_tv_artwork=False, is_done=True):
         if self._listcontainer:
             kodi_log(f'SM: on_exit add_item_listcontainer', 1)
-            return self.add_item_listcontainer(ListItem().get_listitem())
+            return self.add_item_listcontainer(ListItem().get_listitem(offscreen=False))
         try:
             ignore_keys = SETMAIN_ARTWORK if keep_tv_artwork and self._item._dbtype in ['episodes', 'seasons'] else None
         except AttributeError:
