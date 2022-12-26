@@ -183,54 +183,47 @@ class ListItemMonitor(CommonMonitorFunctions):
     def on_finalise_listcontainer(self, process_artwork=True, process_ratings=True):
         kodi_log(f'SM: on_finalise_listcontainer', 1)
         _item = self._item
-        kodi_log(f'SM: on_finalise get_additional_properties', 1)
         _item.get_additional_properties()
-        kodi_log(f'SM: on_finalise get_builtitem', 1)
         _listitem = self._last_listitem = _item.get_builtitem()
-
-        # Item changed so reset properties
-        if not self.is_same_item():
-            kodi_log(f'SM: on_finalise is_same_item', 1)
-            return self.on_exit(keep_tv_artwork=True)
-
-        if process_artwork != ADD_AFTER_PROCESSING and process_ratings != ADD_AFTER_PROCESSING:
-            if self._pre_artwork_thread:
-                kodi_log(f'SM: on_finalise _pre_artwork_thread join', 1)
-                self._pre_artwork_thread.join()
-                self._pre_artwork_thread = None
-            kodi_log(f'SM: on_finalise _pre_artwork_thread add', 1)
-            self.add_item_listcontainer(_listitem)
 
         def _process_artwork():
             kodi_log(f'SM: on_finalise _process_artwork get_builtartwork', 1)
             _artwork = _item.get_builtartwork()
             kodi_log(f'SM: on_finalise _process_artwork get_image_manipulations', 1)
             _artwork.update(_item.get_image_manipulations())
-            kodi_log(f'SM: on_finalise _process_artwork setArt', 1)
+            kodi_log(f'SM: on_finalise _process_artwork setArt: Start', 1)
             _listitem.setArt(_artwork)
-            if process_artwork == ADD_AFTER_PROCESSING and self.is_same_item():
-                kodi_log(f'SM: on_finalise _process_artwork add_item_listcontainer', 1)
-                self.add_item_listcontainer(_listitem)
-
-        if process_artwork:
-            t = Thread(target=_process_artwork)
-            if process_artwork == ADD_AFTER_PROCESSING:
-                self._pre_artwork_thread = t
-            t.start()
+            kodi_log(f'SM: on_finalise _process_artwork setArt: Done', 1)
 
         def _process_ratings():
             kodi_log(f'SM: on_finalise _process_ratings get_all_ratings', 1)
             get_property('IsUpdatingRatings', 'True')
             _details = _item.get_all_ratings() or {}
-            kodi_log(f'SM: on_finalise _process_ratings setProperties', 1)
+            kodi_log(f'SM: on_finalise _process_ratings setProperties: Start', 1)
             _listitem.setProperties(_details.get('infoproperties') or {})
-            if process_ratings == ADD_AFTER_PROCESSING and self.is_same_item():
-                kodi_log(f'SM: on_finalise _process_ratings add_item_listcontainer', 1)
-                self.add_item_listcontainer(_listitem)
+            kodi_log(f'SM: on_finalise _process_ratings setProperties: Done', 1)
             get_property('IsUpdatingRatings', clear_property=True)
 
+        t_artwork = None
+        if process_artwork:
+            t_artwork = Thread(target=_process_artwork)
+            t_artwork.start()
+
+        t_ratings = None
         if process_ratings:
-            Thread(target=_process_ratings).start()
+            t_ratings = Thread(target=_process_ratings)
+            t_ratings.start()
+
+        t_artwork.join() if t_artwork else None
+        t_ratings.join() if t_ratings else None
+
+        if not self.is_same_item():
+            kodi_log(f'SM: on_finalise is_same_item', 1)
+            return self.on_exit(keep_tv_artwork=True)
+
+        kodi_log(f'SM: on_finalise add_item_listcontainer: STARTED', 1)
+        self.add_item_listcontainer(_listitem)
+        kodi_log(f'SM: on_finalise add_item_listcontainer: COMPLETE', 1)
 
     def on_finalise_winproperties(self):
         _item = self._item
@@ -312,7 +305,7 @@ class ListItemMonitor(CommonMonitorFunctions):
 
         # Check if the item has changed before retrieving details again
         if self.is_same_window(update=True) and self.is_same_item(update=True):
-            return self.get_readahead() if self._listcontainer else None
+            return  # return self.get_readahead() if self._listcontainer else None
 
         # Ignore some special folders like next page and parent folder
         if self.get_infolabel('Label') in self._ignored_labels:
