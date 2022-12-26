@@ -205,14 +205,14 @@ class ListItemMonitor(CommonMonitorFunctions):
             get_property('IsUpdatingRatings', clear_property=True)
 
         t_artwork = None
-        if process_artwork:
-            t_artwork = Thread(target=_process_artwork)
-            t_artwork.start()
+        # if process_artwork:
+        #     t_artwork = Thread(target=_process_artwork)
+        #     t_artwork.start()
 
         t_ratings = None
-        if process_ratings:
-            t_ratings = Thread(target=_process_ratings)
-            t_ratings.start()
+        # if process_ratings:
+        #     t_ratings = Thread(target=_process_ratings)
+        #     t_ratings.start()
 
         t_artwork.join() if t_artwork else None
         t_ratings.join() if t_ratings else None
