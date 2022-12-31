@@ -16,6 +16,7 @@ import requests
 
 
 def translate_xml(request):
+    kodi_log(f'translate_xml start')
     def dictify(r, root=True):
         if root:
             return {r.tag: dictify(r, False)}
@@ -30,8 +31,12 @@ def translate_xml(request):
         return d
     if request:
         import xml.etree.ElementTree as ET
+        kodi_log(f'ET.fromstring {request.content}')
         request = ET.fromstring(request.content)
+        kodi_log(f'dictify {request}')
         request = dictify(request)
+
+    kodi_log(f'translate_xml end')
     return request
 
 
